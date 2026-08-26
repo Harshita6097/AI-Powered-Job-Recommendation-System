@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recommendations — AI Job Recommender</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .header {
+      max-width: 900px;
+      margin: 0 auto 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .header h1 { font-size: 1.5rem; font-weight: 700; }
+    .header p { color: #94a3b8; font-size: 0.88rem; margin-top: 0.2rem; }
+
+    .back-btn {
+      padding: 0.5rem 1.2rem;
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #e2e8f0;
+      text-decoration: none;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .back-btn:hover { border-color: #6366f1; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 0.6rem;
+    }
+
+    .badge.hybrid { background: #312e81; color: #a5b4fc; }
+    .badge.content { background: #164e63; color: #67e8f9; }
+
+    .grid {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.2rem;
+    }
+
+    .card {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 14px;
+      padding: 1.4rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .card:hover { border-color: #6366f1; transform: translateY(-2px); }
+
+    .card-rank {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.4rem;
+    }
+
+    .card-location {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-bottom: 0.9rem;
+    }
+
+    .skills-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .skill-tag {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+
+    .score-bar-wrap {
+      margin-top: auto;
+    }
+
+    .score-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 0.3rem;
+    }
+
+    .score-bar {
+      height: 4px;
+      background: #2d3148;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .score-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #a855f7);
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+
+    .empty {
+      max-width: 900px;
+      margin: 4rem auto;
+      text-align: center;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Your Recommendations <span id="mode-badge"></span></h1>
+      <p id="subtitle"></p>
+    </div>
+    <a class="back-btn" href="/">← Back</a>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">No recommendations found.</div>
+
+  <script>
+    const data = JSON.parse(sessionStorage.getItem("recommendations") || "{}");
+    const query = JSON.parse(sessionStorage.getItem("query") || "{}");
+    const recs = data.recommendations || [];
+
+    const badge = document.getElementById("mode-badge");
+    const subtitle = document.getElementById("subtitle");
+
+    if (recs.length > 0) {
+      const mode = recs[0].mode;
+      badge.className = `badge ${mode === "hybrid" ? "hybrid" : "content"}`;
+      badge.textContent = mode === "hybrid" ? "Hybrid" : "Content-Based";
+      subtitle.textContent = query.user_id
+        ? `Showing ${recs.length} jobs for ${query.user_id}`
+        : `Showing ${recs.length} jobs matching your skills`;
+    }
+
+    const maxScore = Math.max(...recs.map(r => r.score), 0.001);
+    const grid = document.getElementById("grid");
+
+    if (recs.length === 0) {
+      document.getElementById("empty").style.display = "block";
+    } else {
+      recs.forEach((job, i) => {
+        const skills = job.skills.split(",").map(s => s.trim()).slice(0, 5);
+        const pct = Math.round((job.score / maxScore) * 100);
+
+        grid.innerHTML += `
+          <div class="card">
+            <div class="card-rank">#${i + 1}</div>
+            <div class="card-title">${job.job_title}</div>
+            <div class="card-location">📍 ${job.location}</div>
+            <div class="skills-wrap">
+              ${skills.map(s => `<span class="skill-tag">${s}</span>`).join("")}
+            </div>
+            <div class="score-bar-wrap">
+              <div class="score-label">
+                <span>Match Score</span>
+                <span>${pct}%</span>
+              </div>
+              <div class="score-bar">
+                <div class="score-fill" style="width: ${pct}%"></div>
+              </div>
+            </div>
+          </div>`;
+      });
+    }
+  </script>
+</body>
+</html>

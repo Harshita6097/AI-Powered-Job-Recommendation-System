@@ -1,0 +1,109 @@
+job_id,job_title,skills,location
+job_1,Data Scientist,"SEO, Digital Marketing, Google Ads",San Francisco
+job_2,Product Manager,"Java, SQL, Cloud, DevOps",Austin
+job_3,UX Designer,"UX/UI, Figma, Adobe XD",New York
+job_4,Marketing Lead,"SEO, Digital Marketing, Google Ads",San Francisco
+job_5,Product Manager,"Python, Machine Learning, Data Analysis",Austin
+job_6,Marketing Lead,"Python, Machine Learning, Data Analysis",Austin
+job_7,Product Manager,"Java, SQL, Cloud, DevOps",Chicago
+job_8,UX Designer,"Python, Machine Learning, Data Analysis",Seattle
+job_9,Software Engineer,"UX/UI, Figma, Adobe XD",Austin
+job_10,Data Scientist,"Java, SQL, Cloud, DevOps",San Francisco
+job_11,Data Scientist,"TensorFlow, Keras, Python, Machine Learning",Boston
+job_12,Backend Developer,"Java, Spring Boot, SQL, REST APIs",Chicago
+job_13,Frontend Developer,"React, Node.js, HTML, CSS",San Francisco
+job_14,DevOps Engineer,"AWS, Docker, Kubernetes, Terraform",Austin
+job_15,Full Stack Developer,"JavaScript, Node.js, React, MongoDB",New York
+job_16,Software Engineer,"C++, Python, Algorithms, Data Structures",Seattle
+job_17,Product Designer,"Figma, Sketch, UX/UI Design",San Francisco
+job_18,Marketing Manager,"Google Analytics, SEO, Content Creation",Austin
+job_19,Data Analyst,"SQL, Excel, Tableau, Power BI",Chicago
+job_20,Cloud Engineer,"AWS, Azure, Cloud Computing, Terraform",San Francisco
+job_21,Mobile Developer,"Swift, Kotlin, Flutter, React Native",New York
+job_22,Cybersecurity Specialist,"Ethical Hacking, SIEM, Cryptography",Austin
+job_23,Machine Learning Engineer,"TensorFlow, Python, Data Analysis",Seattle
+job_24,Product Manager,"Scrum, Jira, Agile, Cloud",Boston
+job_25,Web Developer,"HTML, CSS, JavaScript, React",Chicago
+job_26,AI Researcher,"Machine Learning, Python, TensorFlow, Deep Learning",San Francisco
+job_27,UX/UI Designer,"Figma, Adobe XD, UX Research",Austin
+job_28,Blockchain Developer,"Ethereum, Solidity, Smart Contracts",Seattle
+job_29,Data Engineer,"Hadoop, Spark, SQL, Big Data",San Francisco
+job_30,Product Owner,"Agile, Scrum, Jira, Product Strategy",New York
+job_31,Cloud Solutions Architect,"AWS, Azure, Cloud Computing, Terraform",Austin
+job_32,Salesforce Developer,"Salesforce, Apex, Lightning, CRM",San Francisco
+job_33,Marketing Specialist,"Google Ads, SEO, Content Creation",Chicago
+job_34,Business Analyst,"SQL, Excel, Power BI, Tableau",Seattle
+job_35,Mobile App Developer,"React Native, iOS, Android, JavaScript",New York
+job_36,QA Engineer,"Selenium, Automation Testing, Python",Austin
+job_37,Software Developer,"Java, C++, Algorithms, Data Structures",Chicago
+job_38,Data Scientist,"R, SQL, Machine Learning, Data Visualization",Boston
+job_39,IT Support Specialist,"Linux, Networking, Troubleshooting",San Francisco
+job_40,Cloud Developer,"AWS, Cloud Computing, Node.js, Terraform",Seattle
+job_41,SEO Specialist,"SEO, Content Marketing, Google Analytics",Austin
+job_42,Data Analyst,"Power BI, SQL, Data Visualization",Chicago
+job_43,AI Engineer,"AI, Python, Machine Learning, Deep Learning",San Francisco
+job_44,Security Analyst,"SIEM, Ethical Hacking, Cybersecurity",New York
+job_45,Data Architect,"SQL, Data Modeling, Cloud, Big Data",Austin
+job_46,Software Engineer,"Java, C#, Spring Boot, REST APIs",Seattle
+job_47,Product Designer,"Sketch, UX/UI Design, Figma",San Francisco
+job_48,Marketing Strategist,"SEO, Digital Marketing, Google Analytics",Chicago
+job_49,Web Developer,"React, Node.js, MongoDB, JavaScript",New York
+job_50,Full Stack Developer,"Python, JavaScript, React, Node.js",Boston
+job_51,Product Manager,"Agile, Scrum, Jira, Product Strategy",San Francisco
+job_52,Cloud Architect,"AWS, Azure, Cloud Computing, Terraform",Seattle
+job_53,Frontend Engineer,"HTML, CSS, JavaScript, React",San Francisco
+job_54,Data Scientist,"Python, SQL, Machine Learning, Data Visualization",Austin
+job_55,DevOps Engineer,"AWS, Kubernetes, Docker, CI/CD",Chicago
+job_56,Mobile Developer,"React Native, Swift, Kotlin, iOS",Austin
+job_57,AI Developer,"Python, TensorFlow, Machine Learning",New York
+job_58,IT Manager,"Cloud Computing, ITIL, Networking, Project Management",San Francisco
+job_59,Product Analyst,"SQL, Tableau, Data Analysis, Business Intelligence",Seattle
+job_60,Software Engineer,"Node.js, React, JavaScript, REST APIs",Austin
+job_61,UX/UI Designer,"Sketch, Figma, Wireframing, Prototyping",Chicago
+job_62,Data Engineer,"Python, SQL, Hadoop, Data Pipelines",San Francisco
+job_63,Backend Developer,"Java, Python, Node.js, REST APIs",New York
+job_64,Product Manager,"Agile, Jira, Scrum, Product Roadmap",Seattle
+job_65,Cloud Engineer,"Google Cloud, Kubernetes, Terraform, Cloud Computing",San Francisco
+job_66,Digital Marketing Manager,"SEO, SEM, Google Ads, Content Marketing",Austin
+job_67,Blockchain Developer,"Solidity, Ethereum, Smart Contracts",New York
+job_68,Machine Learning Researcher,"Deep Learning, Python, TensorFlow, Research",San Francisco
+job_69,Web Designer,"HTML, CSS, JavaScript, UX/UI Design",Chicago
+job_70,Technical Support Engineer,"Networking, Linux, IT Support, Troubleshooting",Seattle
+job_71,Data Scientist,"Python, R, Machine Learning, Data Analysis",Austin
+job_72,DevOps Engineer,"AWS, Docker, Kubernetes, CI/CD",San Francisco
+job_73,Product Designer,"Figma, UX/UI, Prototyping, Wireframing",New York
+job_74,Cloud Solutions Architect,"AWS, Azure, Terraform, Cloud Architecture",Chicago
+job_75,Full Stack Developer,"React, Node.js, MongoDB, JavaScript",Seattle
+job_76,Software Engineer,"C++, Java, Algorithms, Data Structures",San Francisco
+job_77,Digital Marketing Specialist,"SEO, SEM, Google Ads, Social Media",Boston
+job_78,Data Analyst,"SQL, Power BI, Tableau, Data Visualization",San Francisco
+job_79,Mobile Developer,"React Native, iOS, Android, JavaScript",Austin
+job_80,Backend Developer,"Java, Spring Boot, SQL, REST APIs",New York
+job_81,Cloud Engineer,"Google Cloud, AWS, Kubernetes, Terraform",Chicago
+job_82,Product Manager,"Agile, Scrum, Jira, Cloud Computing",Seattle
+job_83,Machine Learning Engineer,"Python, TensorFlow, Keras, Deep Learning",San Francisco
+job_84,UX/UI Designer,"Sketch, Figma, Adobe XD, Wireframing",Austin
+job_85,QA Engineer,"Selenium, Automation Testing, Java",New York
+job_86,AI Engineer,"Python, TensorFlow, Machine Learning, Deep Learning",Seattle
+job_87,Security Engineer,"Ethical Hacking, SIEM, Cryptography, Security Audits",San Francisco
+job_88,Frontend Developer,"HTML, CSS, React, JavaScript",Austin
+job_89,Product Analyst,"SQL, Excel, Tableau, Business Intelligence",Chicago
+job_90,Cloud Architect,"AWS, Azure, Cloud Solutions, Terraform",New York
+job_91,Backend Developer,"Node.js, SQL, MongoDB, REST APIs",San Francisco
+job_92,SEO Specialist,"SEO, SEM, Google Analytics, Content Strategy",Seattle
+job_93,Software Engineer,"Java, Python, Spring Boot, Microservices",Austin
+job_94,Blockchain Developer,"Ethereum, Solidity, Smart Contracts, Blockchain",New York
+job_95,Data Engineer,"Hadoop, Spark, SQL, Python, Big Data",Chicago
+job_96,Full Stack Developer,"JavaScript, Node.js, React, MongoDB",San Francisco
+job_97,Data Scientist,"R, Python, Machine Learning, Predictive Modeling",Seattle
+job_98,IT Support Engineer,"Linux, Networking, Troubleshooting, Cloud",Austin
+job_99,Product Manager,"Product Roadmap, Jira, Agile, Scrum",San Francisco
+job_100,Data Engineer,"Python, SQL, Data Pipelines, Hadoop",New York
+job_101,Web Developer,"HTML, CSS, JavaScript, React",Chicago
+job_102,Mobile Developer,"Kotlin, Swift, Flutter, React Native",Seattle
+job_103,Cloud Engineer,"Azure, Google Cloud, AWS, Terraform",San Francisco
+job_104,Data Scientist,"Machine Learning, Python, Big Data, Data Visualization",Austin
+job_105,Security Analyst,"SIEM, Ethical Hacking, Penetration Testing, Cybersecurity",San Francisco
+job_106,DevOps Specialist,"AWS, Docker, Kubernetes, CI/CD",New York
+job_107,UX Designer,"Adobe XD, Figma, UX Research, Wireframing",Chicago
+job_108,Marketing Specialist,"Google Analytics, SEO, Content Marketing, Social Media",San Francisco
