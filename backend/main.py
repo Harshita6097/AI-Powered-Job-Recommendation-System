@@ -32,8 +32,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -168,3 +166,7 @@ def get_skill_gap(req: SkillGapRequest):
 
     gap = skill_gap(req.user_skills, req.job_skills)
     return SkillGapResult(**gap)
+
+
+# Must be mounted last — catches all unmatched routes for the frontend
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
