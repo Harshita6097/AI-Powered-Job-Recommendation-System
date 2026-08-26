@@ -95,7 +95,7 @@ ALIAS_MAP: dict[str, str] = {
     # Languages
     "js"            : "javascript",
     "ts"            : "typescript",
-    "golang"        : "go",
+    "golang"        : "golang",
     "c sharp"       : "c#",
     "dotnet"        : ".net",
     ".net core"     : ".net",
@@ -153,14 +153,14 @@ SKILL_DICT: dict[str, str] = {
     "typescript"                : "Information Technology",
     "c++"                       : "Information Technology",
     "c#"                        : "Information Technology",
-    "go"                        : "Information Technology",
+    "golang"                    : "Information Technology",
     "rust"                      : "Information Technology",
     "scala"                     : "Information Technology",
     "kotlin"                    : "Information Technology",
     "swift"                     : "Information Technology",
     "ruby"                      : "Information Technology",
     "php"                       : "Information Technology",
-    "r"                         : "Analyst",
+    "r programming"             : "Analyst",
     "matlab"                    : "Information Technology",
     "bash"                      : "Information Technology",
     "shell scripting"           : "Information Technology",
@@ -476,6 +476,21 @@ SKILL_DICT: dict[str, str] = {
 # Pre-sort by phrase length descending so longer phrases match first
 _SORTED_SKILLS = sorted(SKILL_DICT.keys(), key=len, reverse=True)
 
+# Build a single compiled combined regex for fast vectorised matching
+# Each skill becomes a named group — one pass over the text finds all skills
+_SKILL_PATTERN = re.compile(
+    "|".join(r"(?P<s{}>\b{}\b)".format(i, re.escape(s))
+             for i, s in enumerate(_SORTED_SKILLS)),
+    re.IGNORECASE
+)
+_IDX_TO_SKILL = {i: s for i, s in enumerate(_SORTED_SKILLS)}
+
+# Pre-compile alias patterns
+_ALIAS_PATTERNS = [
+    (re.compile(r"\b" + re.escape(alias) + r"\b", re.IGNORECASE), canonical)
+    for alias, canonical in ALIAS_MAP.items()
+]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Core extraction functions
@@ -484,27 +499,24 @@ _SORTED_SKILLS = sorted(SKILL_DICT.keys(), key=len, reverse=True)
 def _normalise_text(text: str) -> str:
     """Lowercase, collapse whitespace, keep alphanumeric + key punctuation."""
     text = str(text).lower()
-    text = re.sub(r"[^a-z0-9\s\+\#\./\-]", " ", text)  # keep hyphens for scikit-learn etc.
+    text = re.sub(r"[^a-z0-9\s\+\#\./\-]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
 def _apply_aliases(text: str) -> str:
-    """Replace known aliases with canonical forms."""
-    for alias, canonical in ALIAS_MAP.items():
-        # Word-boundary match for aliases
-        pattern = r"\b" + re.escape(alias) + r"\b"
-        text = re.sub(pattern, canonical, text)
+    """Replace known aliases with canonical forms using pre-compiled patterns."""
+    for pattern, canonical in _ALIAS_PATTERNS:
+        text = pattern.sub(canonical, text)
     return text
 
 
-@lru_cache(maxsize=4096)
+@lru_cache(maxsize=8192)
 def extract_skills(text: str) -> tuple[str, ...]:
     """
     Extract granular skills from a text string.
     Returns a tuple of canonical skill names (hashable for caching).
-
-    Uses phrase matching — longer phrases take priority.
+    Single-pass regex over the full text — much faster than per-skill loops.
     """
     if not text or not str(text).strip():
         return ()
@@ -512,21 +524,27 @@ def extract_skills(text: str) -> tuple[str, ...]:
     normalised = _normalise_text(text)
     normalised = _apply_aliases(normalised)
 
-    found: list[str] = []
+    found: set[str] = set()
     consumed_spans: list[tuple[int, int]] = []
 
-    for skill in _SORTED_SKILLS:
-        pattern = r"\b" + re.escape(skill) + r"\b"
-        for m in re.finditer(pattern, normalised):
-            start, end = m.start(), m.end()
-            # Skip if this span overlaps with an already-matched longer phrase
-            if any(s <= start < e or s < end <= e for s, e in consumed_spans):
-                continue
-            found.append(skill)
+    for m in _SKILL_PATTERN.finditer(normalised):
+        start, end = m.start(), m.end()
+        # Skip overlapping spans (longer phrases already consumed this region)
+        if any(s <= start < e or s < end <= e for s, e in consumed_spans):
+            continue
+        # Find which group matched
+        matched_skill = m.group(0).lower()
+        # Map back to canonical skill name
+        canonical = next(
+            (s for s in _SORTED_SKILLS if s == matched_skill or
+             re.fullmatch(re.escape(s), matched_skill, re.IGNORECASE)),
+            matched_skill
+        )
+        if canonical in SKILL_DICT:
+            found.add(canonical)
             consumed_spans.append((start, end))
-            break   # only match each skill once per text
 
-    return tuple(sorted(set(found)))
+    return tuple(sorted(found))
 
 
 def extract_broad_categories(granular_skills: list[str]) -> list[str]:

@@ -4,8 +4,11 @@ linkedin_dataset/
 # EDA plots — generated locally by running eda.py
 eda_outputs/
 
-# Processed data — generated locally by running feature_engineering.py
+# Processed data — generated locally
 data/
+
+# New indexes
+data/indexes/
 
 # Logs
 *.log
