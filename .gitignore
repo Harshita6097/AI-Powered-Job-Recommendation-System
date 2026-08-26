@@ -1,22 +1,28 @@
+# Dataset — too large for GitHub (use local or cloud storage)
+linkedin_dataset/
+
+# EDA outputs
+eda_outputs/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 .env
 venv/
+env/
 .venv/
-*.egg-info/
-.idea/
+
+# Model artifacts
+*.pkl
+*.joblib
+*.h5
+*.pt
+
+# IDE
 .vscode/
-*.DS_Store
+.idea/
 
-# Raw LinkedIn dataset — too large, not for version control
-archive (1)/
-backend/data/linkedin_dataset/
-backend/data/raw/
-backend/data/generate_data.py
-
-# Trained model artifacts — regenerate locally with python train.py
-backend/model/*.pkl
-
-# Processed data — regenerate locally with python prepare_data.py
-backend/data/processed/
+# OS
+.DS_Store
+Thumbs.db
