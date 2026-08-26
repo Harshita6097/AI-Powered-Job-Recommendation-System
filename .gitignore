@@ -8,3 +8,5 @@ venv/
 .idea/
 .vscode/
 *.DS_Store
+backend/model/*.pkl
+backend/data/generate_data.py
