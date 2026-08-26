@@ -1,7 +1,5 @@
 # AI-Powered Job Recommendation System
 
-![CI](https://github.com/Harshita6097/AI-Powered-Job-Recommendation-System/actions/workflows/ci.yml/badge.svg)
-
 An end-to-end job recommendation engine built with Python and FastAPI, leveraging a **hybrid approach** that combines collaborative filtering (SVD) and content-based filtering (TF-IDF) to deliver accurate, personalized job matches — including handling the cold-start problem for new users.
 
 ---
@@ -14,7 +12,6 @@ An end-to-end job recommendation engine built with Python and FastAPI, leveragin
 | ML / Recommendation | scikit-learn (TruncatedSVD, TF-IDF, Cosine Similarity) |
 | Data | Pandas, NumPy |
 | Frontend | HTML, CSS, Vanilla JavaScript |
-| CI/CD | GitHub Actions |
 | Dataset | LinkedIn Job Postings (Kaggle) |
 
 ---
@@ -52,10 +49,7 @@ An end-to-end job recommendation engine built with Python and FastAPI, leveragin
 │   ├── index.html                 # User input form (existing user / new user)
 │   └── recommendations.html      # Job recommendation results page
 ├── tests/
-│   └── test_recommender.py        # Unit tests — run by CI on every push
-├── .github/
-│   └── workflows/
-│       └── ci.yml                 # GitHub Actions CI/CD pipeline
+│   └── test_recommender.py        # Unit tests
 ├── .gitignore
 └── README.md
 ```
@@ -74,19 +68,6 @@ An end-to-end job recommendation engine built with Python and FastAPI, leveragin
 - No interaction history required
 - User enters their skills directly
 - Pure **TF-IDF cosine similarity** matches skills against all job listings
-
----
-
-## CI/CD Pipeline (GitHub Actions)
-
-On every `git push` or pull request to `main`, the pipeline automatically:
-
-1. Installs all dependencies
-2. Runs `python train.py` — verifies training doesn't break
-3. Runs `pytest tests/` — runs 7 unit tests against the trained model
-4. Starts the FastAPI server and hits `/api/users` to verify the API is healthy
-
-If any step fails, the push is blocked. This ensures the `main` branch is always in a deployable state.
 
 ---
 
@@ -174,4 +155,4 @@ Pass either `user_id` (existing user) or `user_skills` (new user) — not requir
 
 - `backend/model/` artifacts are gitignored — run `python train.py` to regenerate locally
 - `backend/data/raw/` is gitignored — download the LinkedIn dataset from Kaggle and place it there
-- `backend/data/processed/` CSVs are committed so CI can train without the raw dataset
+- `backend/data/processed/` CSVs are committed so the model can be trained without the raw dataset
