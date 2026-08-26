@@ -1,33 +1,41 @@
 """
 prepare_data.py
-Transforms raw LinkedIn job postings into pipeline-ready CSVs.
-Run once locally before train.py:
+Processes raw LinkedIn dataset into pipeline-ready CSVs.
+
+Run once locally:
     python prepare_data.py
 
-Output → backend/data/processed/
-    jobs.csv         : job_id, job_title, skills, location
+Output -> backend/data/processed/
+    jobs.csv         : job_id, job_title, skills, description, experience_level, work_type, location
     users.csv        : user_id, user_skills, user_location
     interactions.csv : user_id, job_id, interaction_score
 """
 import pandas as pd
 import numpy as np
 import random
+import re
 from pathlib import Path
 
 random.seed(42)
 np.random.seed(42)
 
-RAW_DIR       = Path(__file__).parent / "data" / "raw"
+RAW_DIR       = Path(__file__).parent.parent / "linkedin_dataset"
 PROCESSED_DIR = Path(__file__).parent / "data" / "processed"
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── 1. Load and join raw LinkedIn data ────────────────────────────────────────
-print("Loading raw data...")
-postings   = pd.read_csv(RAW_DIR / "postings.csv", usecols=["job_id", "title", "location"])
-job_skills = pd.read_csv(RAW_DIR / "jobs" / "job_skills.csv")
-skills_map = pd.read_csv(RAW_DIR / "mappings" / "skills.csv")
+# ── 1. Load raw data ──────────────────────────────────────────────────────────
+print("Loading raw LinkedIn data...")
+postings = pd.read_csv(
+    RAW_DIR / "postings.csv",
+    usecols=["job_id", "title", "description", "location",
+             "formatted_experience_level", "formatted_work_type", "normalized_salary"]
+)
+job_skills_df = pd.read_csv(RAW_DIR / "jobs" / "job_skills.csv")
+skills_map    = pd.read_csv(RAW_DIR / "mappings" / "skills.csv")
+print(f"  Postings: {len(postings)} | Jobs with skills: {job_skills_df['job_id'].nunique()}")
 
-merged = job_skills.merge(skills_map, on="skill_abr")
+# ── 2. Map skill abbreviations → full names ───────────────────────────────────
+merged  = job_skills_df.merge(skills_map, on="skill_abr")
 grouped = (
     merged.groupby("job_id")["skill_name"]
     .apply(lambda x: ", ".join(sorted(set(x))))
@@ -35,22 +43,31 @@ grouped = (
     .rename(columns={"skill_name": "skills"})
 )
 
-jobs_raw = postings.merge(grouped, on="job_id").dropna(subset=["title", "location", "skills"])
-print(f"  Raw jobs with skills: {len(jobs_raw)}")
-
-# ── 2. Clean and sample jobs ──────────────────────────────────────────────────
-jobs_raw["location"] = jobs_raw["location"].str.split(",").str[:2].str.join(",").str.strip()
-jobs_raw = jobs_raw[jobs_raw["location"].str.contains(r"[A-Z]{2}$", regex=True, na=False)]
-jobs_clean = (
-    jobs_raw
-    .drop_duplicates(subset=["title", "location"])
-    .rename(columns={"title": "job_title"})
-    .reset_index(drop=True)
+# ── 3. Join and clean ─────────────────────────────────────────────────────────
+jobs_raw = postings.merge(grouped, on="job_id")
+jobs_raw = jobs_raw.dropna(subset=["title", "description", "location", "skills"])
+jobs_raw["location"] = (
+    jobs_raw["location"].str.split(",").str[:2].str.join(",").str.strip()
 )
+# Keep US locations only
+jobs_raw = jobs_raw[jobs_raw["location"].str.contains(r"[A-Z]{2}$", regex=True, na=False)]
+jobs_raw = jobs_raw.rename(columns={
+    "title": "job_title",
+    "formatted_experience_level": "experience_level",
+    "formatted_work_type": "work_type"
+})
+jobs_raw["experience_level"] = jobs_raw["experience_level"].fillna("Not Specified")
+jobs_raw["work_type"]        = jobs_raw["work_type"].fillna("Full-time")
 
-N_JOBS     = 500
-top_titles = jobs_clean["job_title"].value_counts().head(80).index
-jobs_filtered = jobs_clean[jobs_clean["job_title"].isin(top_titles)].copy()
+# Clean description — strip excessive whitespace
+jobs_raw["description"] = jobs_raw["description"].str.replace(r"\s+", " ", regex=True).str.strip()
+
+print(f"  After cleaning: {len(jobs_raw)} jobs")
+
+# ── 4. Sample jobs — balanced across top titles ───────────────────────────────
+N_JOBS     = 1000
+top_titles = jobs_raw["job_title"].value_counts().head(100).index
+jobs_filtered = jobs_raw[jobs_raw["job_title"].isin(top_titles)].copy()
 
 per_title = max(1, N_JOBS // len(top_titles))
 sampled_parts = []
@@ -59,14 +76,13 @@ for title, grp in jobs_filtered.groupby("job_title"):
 
 jobs_sampled = pd.concat(sampled_parts).head(N_JOBS).reset_index(drop=True)
 jobs_sampled["job_id"] = [f"job_{i+1}" for i in range(len(jobs_sampled))]
-jobs_final = jobs_sampled[["job_id", "job_title", "skills", "location"]].copy()
-print(f"  Sampled jobs: {len(jobs_final)} across {jobs_final['job_title'].nunique()} unique titles")
+jobs_final = jobs_sampled[[
+    "job_id", "job_title", "skills", "description", "experience_level", "work_type", "location"
+]].copy()
 
-# ── 3. Skill categories and domain → job title affinity ──────────────────────
-# Each domain maps to job titles it strongly prefers (score 4-5)
-# and weakly prefers (score 2-3) — everything else gets score 1-2
-# This creates REAL signal for SVD to learn latent factors from
+print(f"  Sampled: {len(jobs_final)} jobs across {jobs_final['job_title'].nunique()} unique titles")
 
+# ── 5. Skill categories for user generation ───────────────────────────────────
 skill_categories = {
     "Engineering":    ["Engineering", "Manufacturing", "Quality Assurance", "Production"],
     "IT":             ["Information Technology"],
@@ -83,8 +99,6 @@ skill_categories = {
     "Administrative": ["Administrative"],
 }
 
-# Domain affinity: primary → {other_domain: score_base}
-# High score = user in this domain strongly likes jobs in that domain
 domain_affinity = {
     "Engineering":    {"Engineering": 5, "IT": 4, "Research": 3, "Management": 2},
     "IT":             {"IT": 5, "Engineering": 4, "Research": 3, "Product": 2},
@@ -101,23 +115,19 @@ domain_affinity = {
     "Administrative": {"Administrative": 5, "HR": 4, "Management": 3, "Finance": 2},
 }
 
-def get_job_domain(job_skills_str):
-    """Map a job's skills to its closest domain."""
-    job_skill_set = set(s.strip() for s in job_skills_str.split(","))
-    best_domain, best_overlap = "Administrative", 0
+def get_job_domain(skills_str):
+    job_skill_set = set(s.strip() for s in skills_str.split(","))
+    best, best_n = "Administrative", 0
     for domain, skills in skill_categories.items():
-        overlap = len(job_skill_set & set(skills))
-        if overlap > best_overlap:
-            best_overlap = overlap
-            best_domain = domain
-    return best_domain
+        n = len(job_skill_set & set(skills))
+        if n > best_n:
+            best_n, best = n, domain
+    return best
 
-# Pre-compute domain for each job
 jobs_final["_domain"] = jobs_final["skills"].apply(get_job_domain)
-
 locations = jobs_final["location"].value_counts().head(20).index.tolist()
 
-# ── 4. Generate 500 users ─────────────────────────────────────────────────────
+# ── 6. Generate 500 users ─────────────────────────────────────────────────────
 print("Generating users...")
 users, user_domains = [], []
 cat_names = list(skill_categories.keys())
@@ -129,55 +139,41 @@ for i in range(1, 501):
                               min(len(skill_categories[primary]), random.randint(2, 3)))
     s_skills  = random.sample(skill_categories[secondary],
                               min(len(skill_categories[secondary]), random.randint(1, 2)))
-    user_skills = ", ".join(list(dict.fromkeys(p_skills + s_skills)))
     users.append({
         "user_id":       f"user_{i}",
-        "user_skills":   user_skills,
+        "user_skills":   ", ".join(list(dict.fromkeys(p_skills + s_skills))),
         "user_location": random.choice(locations),
     })
     user_domains.append(primary)
 
 users_df = pd.DataFrame(users)
 
-# ── 5. Generate interactions with strong domain signal ────────────────────────
-# Key fix: users interact MORE with jobs in their domain and the scores
-# are strongly correlated with domain affinity — not random noise
-# This gives SVD real latent structure to learn
+# ── 7. Generate interactions with strong domain signal ────────────────────────
 print("Generating interactions...")
-
 interactions = []
 for idx, user in users_df.iterrows():
-    primary_domain = user_domains[idx]
-    affinity       = domain_affinity.get(primary_domain, {})
+    primary  = user_domains[idx]
+    affinity = domain_affinity.get(primary, {})
 
-    # Split job pool: 60% from preferred domains, 40% random
-    preferred_jobs = jobs_final[jobs_final["_domain"].isin(affinity.keys())]
-    other_jobs     = jobs_final[~jobs_final["_domain"].isin(affinity.keys())]
+    preferred = jobs_final[jobs_final["_domain"].isin(affinity.keys())]
+    other     = jobs_final[~jobs_final["_domain"].isin(affinity.keys())]
 
-    n_total     = random.randint(20, 28)
-    n_preferred = int(n_total * 0.65)
-    n_other     = n_total - n_preferred
+    n_total = random.randint(20, 30)
+    n_pref  = int(n_total * 0.65)
+    n_other = n_total - n_pref
 
-    sampled_preferred = preferred_jobs.sample(
-        min(len(preferred_jobs), n_preferred),
-        random_state=random.randint(0, 99999)
-    )
-    sampled_other = other_jobs.sample(
-        min(len(other_jobs), n_other),
-        random_state=random.randint(0, 99999)
-    )
-    sampled = pd.concat([sampled_preferred, sampled_other])
+    sampled = pd.concat([
+        preferred.sample(min(len(preferred), n_pref),  random_state=random.randint(0, 99999)),
+        other.sample(    min(len(other),     n_other), random_state=random.randint(0, 99999)),
+    ])
 
     for _, job in sampled.iterrows():
-        job_domain = job["_domain"]
-        base_score = affinity.get(job_domain, 1)
-        # Small noise ±1 with low probability to keep signal strong
+        base  = affinity.get(job["_domain"], 1)
         noise = np.random.choice([-1, 0, 0, 0, 1], p=[0.05, 0.35, 0.35, 0.15, 0.10])
-        score = int(np.clip(base_score + noise, 1, 5))
         interactions.append({
             "user_id":           user["user_id"],
             "job_id":            job["job_id"],
-            "interaction_score": score,
+            "interaction_score": int(np.clip(base + noise, 1, 5)),
         })
 
 interactions_df = (
@@ -186,23 +182,20 @@ interactions_df = (
     .reset_index(drop=True)
 )
 
-# ── 6. Save ───────────────────────────────────────────────────────────────────
-jobs_final[["job_id", "job_title", "skills", "location"]].to_csv(
-    PROCESSED_DIR / "jobs.csv", index=False)
-users_df.to_csv(PROCESSED_DIR / "users.csv",              index=False)
-interactions_df.to_csv(PROCESSED_DIR / "interactions.csv", index=False)
+# ── 8. Save ───────────────────────────────────────────────────────────────────
+jobs_final.drop(columns=["_domain"]).to_csv(PROCESSED_DIR / "jobs.csv",         index=False)
+users_df.to_csv(                            PROCESSED_DIR / "users.csv",         index=False)
+interactions_df.to_csv(                     PROCESSED_DIR / "interactions.csv",  index=False)
 
-avg_score = interactions_df["interaction_score"].mean()
-score_std  = interactions_df["interaction_score"].std()
-
-print("\n" + "="*50)
+print("\n" + "="*52)
 print("  DATA PREPARATION COMPLETE")
-print("="*50)
+print("="*52)
 print(f"  Jobs           : {len(jobs_final)}")
 print(f"  Unique titles  : {jobs_final['job_title'].nunique()}")
 print(f"  Users          : {len(users_df)}")
 print(f"  Interactions   : {len(interactions_df)}")
 print(f"  Avg per user   : {len(interactions_df)/len(users_df):.1f}")
-print(f"  Avg score      : {avg_score:.2f} ± {score_std:.2f}")
+print(f"  Avg score      : {interactions_df['interaction_score'].mean():.2f} "
+      f"± {interactions_df['interaction_score'].std():.2f}")
 print(f"  Output         : backend/data/processed/")
-print("="*50)
+print("="*52)
