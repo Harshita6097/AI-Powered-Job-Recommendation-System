@@ -7,12 +7,19 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from backend.recommender import load_artifacts, recommend, skill_gap, map_skills
+import config
+from backend.recommender import load_artifacts
+from backend.recommender import recommend as legacy_recommend
+from backend.recommender import skill_gap as legacy_skill_gap
 from backend.schemas import (
     RecommendRequest, RecommendResponse, JobResult,
     SkillGapRequest, SkillGapResult,
 )
 from backend.logger import get_logger
+from src.inference.engine import recommend as engine_recommend
+from src.inference.engine import skill_gap as engine_skill_gap
+from src.inference.engine import load_all
+from src.preprocessing.skill_extractor import extract_skills
 
 log = get_logger("api")
 
@@ -20,8 +27,11 @@ log = get_logger("api")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("=== AI Job Recommender API starting up ===")
-    load_artifacts()
-    log.info("=== Startup complete — ready to serve ===")
+    if config.RETRIEVAL_MODE == "tfidf":
+        load_artifacts()
+    else:
+        load_all()
+    log.info("=== Startup complete — mode=%s — ready to serve ===", config.RETRIEVAL_MODE)
     yield
     log.info("=== API shutting down ===")
 
@@ -61,18 +71,50 @@ def get_recommendations(req: RecommendRequest):
     if not req.skills:
         raise HTTPException(status_code=400, detail="skills list cannot be empty")
 
-    results_df, mapped_skills, unmapped = recommend(
+    if config.RETRIEVAL_MODE != "tfidf":
+        out = engine_recommend(
+            skills=req.skills,
+            experience_level=req.experience_level,
+            top_n=req.top_n,
+            filter_exp=req.filter_exp,
+            filter_remote=req.filter_remote,
+        )
+        if not out["results"]:
+            raise HTTPException(status_code=404, detail="No results found for given filters")
+        jobs = [
+            JobResult(
+                job_id=str(r["job_id"]),
+                title=r["title"],
+                experience_level=r.get("experience_level") or "",
+                industry=r.get("industry") or "",
+                skills=r.get("skills") or "",
+                salary_mid=r.get("salary_mid"),
+                work_type=r.get("work_type") or "",
+                is_remote=bool(r.get("is_remote", False)),
+                state=r.get("state"),
+                match_score=r["match_score"],
+            )
+            for r in out["results"]
+        ]
+        return RecommendResponse(
+            query_skills_raw=out["query_skills_raw"],
+            query_skills_mapped=out["query_skills_mapped"],
+            unmapped_skills=out["unmapped_skills"],
+            retrieval_mode=out["retrieval_mode"],
+            results=jobs,
+        )
+
+    # legacy tfidf path
+    results_df, mapped_skills, unmapped = legacy_recommend(
         raw_skills=req.skills,
         experience_level=req.experience_level,
         top_n=req.top_n,
         filter_exp=req.filter_exp,
         filter_remote=req.filter_remote,
     )
-
     if results_df.empty:
         log.warning("No results for skills=%s exp=%s", req.skills, req.experience_level)
         raise HTTPException(status_code=404, detail="No results found for given filters")
-
     jobs = [
         JobResult(
             job_id=str(row.job_id),
@@ -88,11 +130,11 @@ def get_recommendations(req: RecommendRequest):
         )
         for row in results_df.itertuples()
     ]
-
     return RecommendResponse(
         query_skills_raw=req.skills,
         query_skills_mapped=mapped_skills,
         unmapped_skills=unmapped,
+        retrieval_mode="tfidf",
         results=jobs,
     )
 
@@ -111,28 +153,58 @@ async def recommend_from_resume(
     text = " ".join(page.get_text() for page in doc).lower()
     doc.close()
 
-    # Extract skills by checking which SKILL_MAP keys appear in resume text
+    if config.RETRIEVAL_MODE != "tfidf":
+        found_raw = list(extract_skills(text))
+        if not found_raw:
+            raise HTTPException(status_code=422, detail="No recognisable skills found in resume")
+        log.info("Resume '%s' — extracted %d granular skills", file.filename, len(found_raw))
+        out = engine_recommend(
+            skills=found_raw,
+            experience_level=experience_level,
+            top_n=10,
+            filter_remote=filter_remote,
+        )
+        if not out["results"]:
+            raise HTTPException(status_code=404, detail="No results found")
+        jobs = [
+            JobResult(
+                job_id=str(r["job_id"]),
+                title=r["title"],
+                experience_level=r.get("experience_level") or "",
+                industry=r.get("industry") or "",
+                skills=r.get("skills") or "",
+                salary_mid=r.get("salary_mid"),
+                work_type=r.get("work_type") or "",
+                is_remote=bool(r.get("is_remote", False)),
+                state=r.get("state"),
+                match_score=r["match_score"],
+            )
+            for r in out["results"]
+        ]
+        return RecommendResponse(
+            query_skills_raw=found_raw[:10],
+            query_skills_mapped=out["query_skills_mapped"],
+            unmapped_skills=out["unmapped_skills"],
+            retrieval_mode=out["retrieval_mode"],
+            results=jobs,
+        )
+
+    # legacy tfidf path
     from backend.recommender import SKILL_MAP, SKILL_CATEGORIES
     found_raw = [k for k in SKILL_MAP if k in text]
-    # Also check direct category names
     found_raw += [c for c in SKILL_CATEGORIES if c.lower() in text]
-
     if not found_raw:
         log.warning("Resume '%s' — no recognisable skills found", file.filename)
         raise HTTPException(status_code=422, detail="No recognisable skills found in resume")
-
     log.info("Resume '%s' — extracted %d skill signals", file.filename, len(found_raw))
-
-    results_df, mapped_skills, unmapped = recommend(
+    results_df, mapped_skills, unmapped = legacy_recommend(
         raw_skills=found_raw,
         experience_level=experience_level,
         top_n=10,
         filter_remote=filter_remote,
     )
-
     if results_df.empty:
         raise HTTPException(status_code=404, detail="No results found")
-
     jobs = [
         JobResult(
             job_id=str(row.job_id),
@@ -148,11 +220,11 @@ async def recommend_from_resume(
         )
         for row in results_df.itertuples()
     ]
-
     return RecommendResponse(
         query_skills_raw=found_raw[:10],
         query_skills_mapped=mapped_skills,
         unmapped_skills=unmapped,
+        retrieval_mode="tfidf",
         results=jobs,
     )
 
@@ -164,7 +236,10 @@ def get_skill_gap(req: SkillGapRequest):
     if not req.job_skills:
         raise HTTPException(status_code=400, detail="job_skills cannot be empty")
 
-    gap = skill_gap(req.user_skills, req.job_skills)
+    if config.RETRIEVAL_MODE != "tfidf":
+        gap = engine_skill_gap(req.user_skills, req.job_skills)
+    else:
+        gap = legacy_skill_gap(req.user_skills, req.job_skills)
     return SkillGapResult(**gap)
 
 

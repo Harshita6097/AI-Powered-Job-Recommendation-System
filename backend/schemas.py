@@ -21,6 +21,7 @@ class JobResult(BaseModel):
     is_remote: bool
     state: Optional[str]
     match_score: float
+    retrieval_mode: Optional[str] = None
 
 
 class SkillGapResult(BaseModel):
@@ -33,6 +34,7 @@ class RecommendResponse(BaseModel):
     query_skills_raw: List[str]
     query_skills_mapped: List[str]
     unmapped_skills: List[str]
+    retrieval_mode: str = "tfidf"
     results: List[JobResult]
 
 
