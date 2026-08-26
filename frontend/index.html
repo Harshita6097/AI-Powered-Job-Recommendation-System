@@ -95,6 +95,24 @@
 
     .hint { font-size: .78rem; color: #888; margin-top: .5rem; }
 
+    /* ── Pipeline badge ── */
+    .pipeline-badge {
+      display: inline-flex; align-items: center; gap: .35rem;
+      font-size: .75rem; font-weight: 600; padding: .25rem .7rem;
+      border-radius: 20px; letter-spacing: .03em; text-transform: uppercase;
+    }
+    .pipeline-badge.hybrid  { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+    .pipeline-badge.bm25    { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+    .pipeline-badge.dense   { background: #ede7f6; color: #4527a0; border: 1px solid #ce93d8; }
+    .pipeline-badge.tfidf   { background: #e3f2fd; color: #0a66c2; border: 1px solid #90caf9; }
+
+    /* ── Skill tags in job card ── */
+    .skill-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .6rem; }
+    .skill-chip {
+      background: #f0f4ff; color: #3d5a99; border-radius: 10px;
+      padding: .15rem .55rem; font-size: .75rem;
+    }
+
     /* ── Mapped skills notice ── */
     .mapped-notice {
       background: #f0f7ff; border-left: 3px solid #0a66c2;
@@ -275,7 +293,10 @@
   <div id="results-section">
     <div class="results-header">
       <h2 id="results-title">Top Recommendations</h2>
-      <span class="results-count" id="results-count"></span>
+      <div style="display:flex;align-items:center;gap:.7rem">
+        <span id="pipeline-badge"></span>
+        <span class="results-count" id="results-count"></span>
+      </div>
     </div>
     <div class="mapped-notice" id="mapped-notice" style="display:none"></div>
     <div id="results-list"></div>
@@ -402,35 +423,65 @@
     const section = document.getElementById("results-section");
     const list    = document.getElementById("results-list");
     const notice  = document.getElementById("mapped-notice");
+    const mode    = data.retrieval_mode || "tfidf";
 
     section.style.display = "block";
     document.getElementById("results-count").textContent = `${data.results.length} jobs found`;
 
+    // Pipeline badge
+    const badge = document.getElementById("pipeline-badge");
+    const modeLabels = { hybrid: "⚡ Hybrid", bm25: "🔍 BM25", dense: "🧠 Dense", tfidf: "📐 TF-IDF" };
+    badge.className = `pipeline-badge ${mode}`;
+    badge.textContent = modeLabels[mode] || mode;
+
     // Mapped skills notice
-    if (data.query_skills_mapped.length) {
+    if (data.query_skills_mapped && data.query_skills_mapped.length) {
       notice.style.display = "block";
-      const unmappedNote = data.unmapped_skills.length
-        ? ` &nbsp;|&nbsp; Could not map: <span>${data.unmapped_skills.join(", ")}</span>`
+      const label = mode === "tfidf" ? "Mapped to categories" : "Matched skills";
+      const unmappedNote = data.unmapped_skills && data.unmapped_skills.length
+        ? ` &nbsp;|&nbsp; Not recognised: <span>${data.unmapped_skills.join(", ")}</span>`
         : "";
-      notice.innerHTML = `Your skills were mapped to: <span>${data.query_skills_mapped.join(", ")}</span>${unmappedNote}`;
+      notice.innerHTML = `${label}: <span>${data.query_skills_mapped.join(", ")}</span>${unmappedNote}`;
     } else {
       notice.style.display = "none";
     }
 
+    // Normalise scores to 0-100 for bar width
+    const scores = data.results.map(j => j.match_score);
+    const maxScore = Math.max(...scores) || 1;
+    const isTfidf = mode === "tfidf";
+
     list.innerHTML = "";
     data.results.forEach((job, idx) => {
-      list.appendChild(buildJobCard(job, idx, data.query_skills_raw));
+      const barPct = isTfidf ? job.match_score : (job.match_score / maxScore) * 100;
+      list.appendChild(buildJobCard(job, idx, data.query_skills_raw, barPct, mode));
     });
 
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function buildJobCard(job, idx, userSkills) {
-    const score     = job.match_score;
-    const scoreClass = score >= 55 ? "high" : score >= 35 ? "medium" : "low";
-    const salary    = job.salary_mid ? `$${Math.round(job.salary_mid).toLocaleString()}` : "Salary N/A";
-    const remote    = job.is_remote ? "🌐 Remote" : job.state || "On-site";
-    const cardId    = `card-${idx}`;
+  function buildJobCard(job, idx, userSkills, barPct, mode) {
+    const salary  = job.salary_mid ? `$${Math.round(job.salary_mid).toLocaleString()}` : "Salary N/A";
+    const remote  = job.is_remote ? "🌐 Remote" : (job.state || "On-site");
+    const cardId  = `card-${idx}`;
+
+    // Score label formatted per mode
+    let scoreLabel;
+    if (mode === "tfidf")       scoreLabel = `${job.match_score}% match`;
+    else if (mode === "hybrid") scoreLabel = `${job.match_score.toFixed(2)} score`;
+    else if (mode === "dense")  scoreLabel = `${(job.match_score * 100).toFixed(1)}% sim`;
+    else                        scoreLabel = `${job.match_score.toFixed(2)} BM25`;
+
+    const scoreClass = barPct >= 70 ? "high" : barPct >= 40 ? "medium" : "low";
+
+    // Granular skill chips
+    const skillChips = (job.skills || "")
+      .split("|")
+      .filter(Boolean)
+      .map(s => `<span class="skill-chip">${s.trim()}</span>`)
+      .join("");
+
+    const safeSkills = (job.skills || "").replace(/'/g, "&#39;");
 
     const card = document.createElement("div");
     card.className = "job-card";
@@ -439,23 +490,25 @@
         <div>
           <div class="job-title">${job.title}</div>
           <div class="job-meta">
-            <span>🏢 ${job.industry}</span>
-            <span>📊 ${job.experience_level}</span>
-            <span>💼 ${job.work_type}</span>
+            <span>🏢 ${job.industry || "—"}</span>
+            <span>📊 ${job.experience_level || "—"}</span>
+            <span>💼 ${job.work_type || "—"}</span>
             <span>📍 ${remote}</span>
             <span>💰 ${salary}</span>
           </div>
         </div>
-        <div class="score-badge ${scoreClass}">${score}% match</div>
+        <div class="score-badge ${scoreClass}">${scoreLabel}</div>
       </div>
+
+      ${skillChips ? `<div class="skill-chips">${skillChips}</div>` : ""}
 
       <div class="score-bar-wrap">
         <div class="score-bar-bg">
-          <div class="score-bar-fill" style="width:${score}%"></div>
+          <div class="score-bar-fill" style="width:${Math.min(barPct, 100).toFixed(1)}%"></div>
         </div>
       </div>
 
-      <button class="gap-toggle" onclick="toggleGap('${cardId}', ${JSON.stringify(userSkills).replace(/"/g, '&quot;')}, '${job.skills}')">
+      <button class="gap-toggle" onclick="toggleGap('${cardId}', ${JSON.stringify(userSkills).replace(/"/g, '&quot;')}, '${safeSkills}')">
         Show Skill Gap ▾
       </button>
       <div class="gap-section" id="${cardId}"></div>
