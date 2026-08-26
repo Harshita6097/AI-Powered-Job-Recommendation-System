@@ -4,7 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pathlib import Path
-from recommender import load_data, build_models, recommend
+import pandas as pd
+from recommender import load_model, recommend
 
 app = FastAPI(title="AI Job Recommender")
 
@@ -15,13 +16,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount frontend
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+DATA_DIR = Path(__file__).parent / "data" / "processed"
+if not DATA_DIR.exists():
+    DATA_DIR = Path(__file__).parent / "data"
+
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
-# Load data and build models once at startup
-jobs, users, interactions = load_data()
-vectorizer, job_vectors, svd_predictions, interaction_matrix = build_models(jobs, interactions)
+# Load pre-trained model artifacts once at startup
+vectorizer, job_vectors, svd_predictions, interaction_matrix, jobs = load_model()
+users = pd.read_csv(DATA_DIR / "users.csv")
 
 
 class RecommendRequest(BaseModel):
@@ -49,11 +53,11 @@ def get_users():
 def get_recommendations(req: RecommendRequest):
     try:
         results = recommend(
-            jobs=jobs,
             vectorizer=vectorizer,
             job_vectors=job_vectors,
             svd_predictions=svd_predictions,
             interaction_matrix=interaction_matrix,
+            jobs=jobs,
             user_id=req.user_id,
             user_skills=req.user_skills,
             top_k=req.top_k,

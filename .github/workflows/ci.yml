@@ -1,0 +1,46 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Train & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Why: ensures consistent Python version across all environments
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── Why: installs all backend dependencies including scikit-learn, fastapi, etc.
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt pytest
+
+      # ── Why: CI uses the committed processed CSVs to train the model
+      #         so we don't need the raw LinkedIn dataset on GitHub
+      #         This verifies train.py doesn't break on every push
+      - name: Train model
+        run: python backend/train.py
+
+      # ── Why: runs all 7 unit tests against the freshly trained model
+      #         if any test fails, the pipeline fails and the push is blocked
+      - name: Run tests
+        run: pytest tests/ -v
+
+      # ── Why: verifies the FastAPI app starts without errors
+      - name: Verify API starts
+        run: |
+          uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+          curl -f http://localhost:8000/api/users || exit 1
+          kill %1
