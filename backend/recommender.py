@@ -1,9 +1,13 @@
 import pickle
 import json
+import time
 import numpy as np
 import pandas as pd
 from scipy.sparse import load_npz
 from sklearn.metrics.pairwise import cosine_similarity
+from backend.logger import get_logger
+
+log = get_logger("recommender")
 
 # ── Skill normalisation map ───────────────────────────────────────────────────
 # Maps granular user-typed skills → one of the 35 LinkedIn skill categories
@@ -146,6 +150,9 @@ _meta: dict = {}
 def load_artifacts(base_path: str = "data/processed"):
     global SKILL_CATEGORIES, _df, _tfidf, _vectorizer, _meta
 
+    log.info("Loading artifacts from '%s'…", base_path)
+    t0 = time.time()
+
     _df = pd.read_csv(f"{base_path}/jobs_features.csv")
     _df["skills_list"] = _df["skills"].apply(
         lambda x: x.split("|") if isinstance(x, str) else []
@@ -158,6 +165,7 @@ def load_artifacts(base_path: str = "data/processed"):
         _meta = json.load(f)
 
     SKILL_CATEGORIES = _meta["skill_categories"]
+    log.info("Artifacts loaded — %d jobs, TF-IDF %s (%.2fs)", len(_df), _tfidf.shape, time.time() - t0)
 
 
 def map_skills(raw_skills: list[str]) -> tuple[list[str], list[str], list[str]]:
@@ -175,9 +183,12 @@ def map_skills(raw_skills: list[str]) -> tuple[list[str], list[str], list[str]]:
         else:
             unmapped.append(s)
 
-    # Deduplicate while preserving order
     seen = set()
     deduped = [x for x in mapped if not (x in seen or seen.add(x))]
+
+    if unmapped:
+        log.debug("Unmapped skills (no category match): %s", unmapped)
+
     return deduped, unmapped, mapped
 
 
@@ -194,10 +205,12 @@ def recommend(
     filter_exp: bool = False,
     filter_remote: bool = False,
 ) -> tuple[pd.DataFrame, list[str], list[str]]:
+    t0 = time.time()
     mapped_skills, unmapped, _ = map_skills(raw_skills)
 
-    # Fall back to raw input if nothing mapped
     query_skills = mapped_skills if mapped_skills else [s.strip().title() for s in raw_skills]
+    log.info("Recommend | raw=%s → mapped=%s | exp=%s filter_exp=%s remote=%s",
+             raw_skills, query_skills, experience_level, filter_exp, filter_remote)
 
     user_text = _build_feature_text(query_skills, experience_level)
     user_vector = _vectorizer.transform([user_text])
@@ -216,6 +229,7 @@ def recommend(
         candidate_idx = candidate_idx[candidate_df.index] if filter_exp else np.where(mask)[0]
 
     if len(candidate_df) == 0:
+        log.warning("No candidates after filtering — returning empty results")
         return pd.DataFrame(), mapped_skills, unmapped
 
     scores = cosine_similarity(user_vector, _tfidf[candidate_idx]).flatten()
@@ -227,6 +241,10 @@ def recommend(
         "work_type", "is_remote", "state"
     ]].copy()
     results["match_score"] = np.round(scores[top_idx] * 100, 2)
+
+    log.info("Recommend | top result='%s' score=%.1f%% | candidates=%d | %.3fs",
+             results.iloc[0]["title_clean"], results.iloc[0]["match_score"],
+             len(candidate_df), time.time() - t0)
 
     return results.reset_index(drop=True), mapped_skills, unmapped
 

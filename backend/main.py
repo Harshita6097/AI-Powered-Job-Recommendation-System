@@ -1,6 +1,7 @@
 import io
+import time
 import pymupdf as fitz
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -11,12 +12,18 @@ from backend.schemas import (
     RecommendRequest, RecommendResponse, JobResult,
     SkillGapRequest, SkillGapResult,
 )
+from backend.logger import get_logger
+
+log = get_logger("api")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("=== AI Job Recommender API starting up ===")
     load_artifacts()
+    log.info("=== Startup complete — ready to serve ===")
     yield
+    log.info("=== API shutting down ===")
 
 
 app = FastAPI(
@@ -35,8 +42,19 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    t0 = time.time()
+    response = await call_next(request)
+    log.info("%s %s → %d (%.3fs)",
+             request.method, request.url.path,
+             response.status_code, time.time() - t0)
+    return response
+
+
 @app.get("/health")
 def health():
+    log.debug("Health check")
     return {"status": "ok"}
 
 
@@ -54,6 +72,7 @@ def get_recommendations(req: RecommendRequest):
     )
 
     if results_df.empty:
+        log.warning("No results for skills=%s exp=%s", req.skills, req.experience_level)
         raise HTTPException(status_code=404, detail="No results found for given filters")
 
     jobs = [
@@ -101,7 +120,10 @@ async def recommend_from_resume(
     found_raw += [c for c in SKILL_CATEGORIES if c.lower() in text]
 
     if not found_raw:
+        log.warning("Resume '%s' — no recognisable skills found", file.filename)
         raise HTTPException(status_code=422, detail="No recognisable skills found in resume")
+
+    log.info("Resume '%s' — extracted %d skill signals", file.filename, len(found_raw))
 
     results_df, mapped_skills, unmapped = recommend(
         raw_skills=found_raw,
