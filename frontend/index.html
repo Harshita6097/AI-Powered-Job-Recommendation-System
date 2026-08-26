@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Job Recommender</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0a66c2, #004182);
+      color: #fff;
+      padding: 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 700; }
+    header p  { margin-top: .4rem; opacity: .85; font-size: .95rem; }
+
+    .container { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* ── Search card ── */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.8rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { font-size: 1.1rem; margin-bottom: 1.2rem; color: #0a66c2; }
+
+    /* Tag input */
+    .tag-input-wrap {
+      border: 1.5px solid #d0d5dd;
+      border-radius: 8px;
+      padding: .5rem .6rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      cursor: text;
+      min-height: 48px;
+      transition: border-color .2s;
+    }
+    .tag-input-wrap:focus-within { border-color: #0a66c2; }
+    .tag {
+      background: #e8f0fe;
+      color: #0a66c2;
+      border-radius: 20px;
+      padding: .25rem .75rem;
+      font-size: .85rem;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    .tag button {
+      background: none; border: none; cursor: pointer;
+      color: #0a66c2; font-size: 1rem; line-height: 1; padding: 0;
+    }
+    .tag-input-wrap input {
+      border: none; outline: none; font-size: .9rem;
+      flex: 1; min-width: 140px; padding: .2rem .3rem;
+    }
+
+    .row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+
+    select, .btn {
+      height: 42px; border-radius: 8px; font-size: .9rem;
+    }
+    select {
+      border: 1.5px solid #d0d5dd; padding: 0 .8rem;
+      background: #fff; flex: 1; min-width: 160px; cursor: pointer;
+    }
+    select:focus { outline: none; border-color: #0a66c2; }
+
+    .toggles { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .toggle-label {
+      display: flex; align-items: center; gap: .4rem;
+      font-size: .88rem; cursor: pointer; user-select: none;
+    }
+    .toggle-label input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+
+    .btn {
+      background: #0a66c2; color: #fff; border: none;
+      padding: 0 1.8rem; cursor: pointer; font-weight: 600;
+      transition: background .2s;
+    }
+    .btn:hover { background: #004182; }
+    .btn:disabled { background: #a0b4c8; cursor: not-allowed; }
+
+    .hint { font-size: .78rem; color: #888; margin-top: .5rem; }
+
+    /* ── Mapped skills notice ── */
+    .mapped-notice {
+      background: #f0f7ff; border-left: 3px solid #0a66c2;
+      border-radius: 6px; padding: .7rem 1rem;
+      font-size: .85rem; color: #333; margin-bottom: 1rem;
+    }
+    .mapped-notice span { color: #0a66c2; font-weight: 600; }
+
+    /* ── Results ── */
+    #results-section { display: none; }
+    .results-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 1rem;
+    }
+    .results-header h2 { font-size: 1.05rem; color: #333; }
+    .results-count { font-size: .85rem; color: #666; }
+
+    .job-card {
+      background: #fff; border-radius: 10px;
+      padding: 1.2rem 1.4rem; margin-bottom: 1rem;
+      box-shadow: 0 1px 6px rgba(0,0,0,.07);
+      border-left: 4px solid #0a66c2;
+      transition: box-shadow .2s;
+    }
+    .job-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.12); }
+
+    .job-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .job-title { font-size: 1.05rem; font-weight: 700; color: #0a66c2; }
+    .job-meta  { font-size: .82rem; color: #666; margin-top: .3rem; }
+    .job-meta span { margin-right: .8rem; }
+
+    .score-badge {
+      background: #0a66c2; color: #fff;
+      border-radius: 20px; padding: .3rem .9rem;
+      font-size: .85rem; font-weight: 700; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .score-badge.high   { background: #057642; }
+    .score-badge.medium { background: #0a66c2; }
+    .score-badge.low    { background: #b24020; }
+
+    .score-bar-wrap { margin-top: .7rem; }
+    .score-bar-bg {
+      background: #e9ecef; border-radius: 4px; height: 6px; overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, #0a66c2, #00a0dc);
+      transition: width .6s ease;
+    }
+
+    /* Skill gap toggle */
+    .gap-toggle {
+      background: none; border: 1px solid #0a66c2; color: #0a66c2;
+      border-radius: 6px; padding: .3rem .8rem; font-size: .8rem;
+      cursor: pointer; margin-top: .9rem; transition: all .2s;
+    }
+    .gap-toggle:hover { background: #0a66c2; color: #fff; }
+
+    .gap-section {
+      margin-top: .8rem; padding: .8rem 1rem;
+      background: #f8f9fa; border-radius: 8px;
+      font-size: .83rem; display: none;
+    }
+    .gap-section.open { display: block; }
+    .gap-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .4rem; }
+    .gap-label { font-weight: 600; color: #444; margin-bottom: .3rem; }
+    .skill-tag {
+      border-radius: 12px; padding: .2rem .65rem; font-size: .78rem;
+    }
+    .skill-tag.matched { background: #d4edda; color: #155724; }
+    .skill-tag.missing { background: #f8d7da; color: #721c24; }
+
+    /* ── Resume section ── */
+    .resume-area {
+      border: 2px dashed #d0d5dd; border-radius: 8px;
+      padding: 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color .2s; position: relative;
+    }
+    .resume-area:hover, .resume-area.drag-over { border-color: #0a66c2; background: #f0f7ff; }
+    .resume-area input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .resume-area p { font-size: .9rem; color: #666; }
+    .resume-area strong { color: #0a66c2; }
+    #resume-filename { font-size: .82rem; color: #0a66c2; margin-top: .5rem; }
+
+    /* ── Loader ── */
+    .loader {
+      display: none; text-align: center; padding: 2rem;
+      font-size: .95rem; color: #666;
+    }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid #e0e0e0;
+      border-top-color: #0a66c2; border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto .8rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg {
+      background: #fff3cd; border-left: 3px solid #ffc107;
+      border-radius: 6px; padding: .7rem 1rem;
+      font-size: .88rem; color: #856404; margin-bottom: 1rem; display: none;
+    }
+
+    @media (max-width: 600px) {
+      .row { flex-direction: column; }
+      .job-top { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎯 AI Job Recommender</h1>
+  <p>Enter your skills and get personalised job recommendations with skill gap analysis</p>
+</header>
+
+<div class="container">
+
+  <!-- Search Card -->
+  <div class="card">
+    <h2>Find Jobs Matching Your Skills</h2>
+
+    <div class="tag-input-wrap" id="tag-wrap" onclick="document.getElementById('skill-input').focus()">
+      <input id="skill-input" type="text"
+             placeholder="Type a skill and press Enter (e.g. Python, Figma, Marketing…)" />
+    </div>
+    <p class="hint">Press Enter or comma to add a skill. Click × to remove.</p>
+
+    <div class="row">
+      <select id="exp-select">
+        <option value="">Any Experience Level</option>
+        <option value="Internship">Internship</option>
+        <option value="Entry">Entry</option>
+        <option value="Associate">Associate</option>
+        <option value="Mid-Senior">Mid-Senior</option>
+        <option value="Director">Director</option>
+        <option value="Executive">Executive</option>
+      </select>
+
+      <div class="toggles">
+        <label class="toggle-label">
+          <input type="checkbox" id="filter-exp" /> Match experience level
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="filter-remote" /> Remote only
+        </label>
+      </div>
+
+      <button class="btn" id="search-btn" onclick="search()">Search Jobs</button>
+    </div>
+  </div>
+
+  <!-- Resume Card -->
+  <div class="card">
+    <h2>Or Upload Your Resume (PDF)</h2>
+    <div class="resume-area" id="resume-area">
+      <input type="file" id="resume-file" accept=".pdf" onchange="handleResumeSelect(event)" />
+      <p>📄 <strong>Click to upload</strong> or drag & drop your PDF resume</p>
+      <div id="resume-filename"></div>
+    </div>
+    <div class="row" style="margin-top:1rem">
+      <button class="btn" id="resume-btn" onclick="searchResume()" disabled>Search with Resume</button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div class="error-msg" id="error-msg"></div>
+
+  <!-- Loader -->
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    Finding the best matches for you…
+  </div>
+
+  <!-- Results -->
+  <div id="results-section">
+    <div class="results-header">
+      <h2 id="results-title">Top Recommendations</h2>
+      <span class="results-count" id="results-count"></span>
+    </div>
+    <div class="mapped-notice" id="mapped-notice" style="display:none"></div>
+    <div id="results-list"></div>
+  </div>
+
+</div>
+
+<script>
+  const API = "http://localhost:8000";
+  let tags = [];
+
+  // ── Tag input ──────────────────────────────────────────────
+  document.getElementById("skill-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(e.target.value.trim().replace(/,$/, ""));
+      e.target.value = "";
+    } else if (e.key === "Backspace" && e.target.value === "" && tags.length) {
+      removeTag(tags.length - 1);
+    }
+  });
+
+  function addTag(val) {
+    if (!val || tags.includes(val)) return;
+    tags.push(val);
+    renderTags();
+  }
+
+  function removeTag(i) {
+    tags.splice(i, 1);
+    renderTags();
+  }
+
+  function renderTags() {
+    const wrap = document.getElementById("tag-wrap");
+    const input = document.getElementById("skill-input");
+    wrap.querySelectorAll(".tag").forEach(t => t.remove());
+    tags.forEach((t, i) => {
+      const el = document.createElement("div");
+      el.className = "tag";
+      el.innerHTML = `${t} <button onclick="removeTag(${i})">×</button>`;
+      wrap.insertBefore(el, input);
+    });
+  }
+
+  // ── Resume ─────────────────────────────────────────────────
+  let resumeFile = null;
+
+  function handleResumeSelect(e) {
+    resumeFile = e.target.files[0];
+    if (resumeFile) {
+      document.getElementById("resume-filename").textContent = `Selected: ${resumeFile.name}`;
+      document.getElementById("resume-btn").disabled = false;
+    }
+  }
+
+  const resumeArea = document.getElementById("resume-area");
+  resumeArea.addEventListener("dragover", e => { e.preventDefault(); resumeArea.classList.add("drag-over"); });
+  resumeArea.addEventListener("dragleave", () => resumeArea.classList.remove("drag-over"));
+  resumeArea.addEventListener("drop", e => {
+    e.preventDefault();
+    resumeArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === "application/pdf") {
+      resumeFile = file;
+      document.getElementById("resume-filename").textContent = `Selected: ${file.name}`;
+      document.getElementById("resume-btn").disabled = false;
+    }
+  });
+
+  // ── Search ─────────────────────────────────────────────────
+  async function search() {
+    if (!tags.length) { showError("Please add at least one skill."); return; }
+
+    const payload = {
+      skills: tags,
+      experience_level: document.getElementById("exp-select").value || null,
+      top_n: 10,
+      filter_exp: document.getElementById("filter-exp").checked,
+      filter_remote: document.getElementById("filter-remote").checked,
+    };
+
+    showLoader();
+    try {
+      const res = await fetch(`${API}/recommend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+      const data = await res.json();
+      renderResults(data);
+    } catch (err) {
+      showError(err.message || "Could not connect to the API. Make sure the server is running.");
+    } finally {
+      hideLoader();
+    }
+  }
+
+  async function searchResume() {
+    if (!resumeFile) return;
+    const form = new FormData();
+    form.append("file", resumeFile);
+    const exp = document.getElementById("exp-select").value;
+    if (exp) form.append("experience_level", exp);
+    form.append("filter_remote", document.getElementById("filter-remote").checked);
+
+    showLoader();
+    try {
+      const res = await fetch(`${API}/resume`, { method: "POST", body: form });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+      const data = await res.json();
+      renderResults(data);
+    } catch (err) {
+      showError(err.message || "Could not connect to the API. Make sure the server is running.");
+    } finally {
+      hideLoader();
+    }
+  }
+
+  // ── Render results ─────────────────────────────────────────
+  function renderResults(data) {
+    hideError();
+    const section = document.getElementById("results-section");
+    const list    = document.getElementById("results-list");
+    const notice  = document.getElementById("mapped-notice");
+
+    section.style.display = "block";
+    document.getElementById("results-count").textContent = `${data.results.length} jobs found`;
+
+    // Mapped skills notice
+    if (data.query_skills_mapped.length) {
+      notice.style.display = "block";
+      const unmappedNote = data.unmapped_skills.length
+        ? ` &nbsp;|&nbsp; Could not map: <span>${data.unmapped_skills.join(", ")}</span>`
+        : "";
+      notice.innerHTML = `Your skills were mapped to: <span>${data.query_skills_mapped.join(", ")}</span>${unmappedNote}`;
+    } else {
+      notice.style.display = "none";
+    }
+
+    list.innerHTML = "";
+    data.results.forEach((job, idx) => {
+      list.appendChild(buildJobCard(job, idx, data.query_skills_raw));
+    });
+
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function buildJobCard(job, idx, userSkills) {
+    const score     = job.match_score;
+    const scoreClass = score >= 55 ? "high" : score >= 35 ? "medium" : "low";
+    const salary    = job.salary_mid ? `$${Math.round(job.salary_mid).toLocaleString()}` : "Salary N/A";
+    const remote    = job.is_remote ? "🌐 Remote" : job.state || "On-site";
+    const cardId    = `card-${idx}`;
+
+    const card = document.createElement("div");
+    card.className = "job-card";
+    card.innerHTML = `
+      <div class="job-top">
+        <div>
+          <div class="job-title">${job.title}</div>
+          <div class="job-meta">
+            <span>🏢 ${job.industry}</span>
+            <span>📊 ${job.experience_level}</span>
+            <span>💼 ${job.work_type}</span>
+            <span>📍 ${remote}</span>
+            <span>💰 ${salary}</span>
+          </div>
+        </div>
+        <div class="score-badge ${scoreClass}">${score}% match</div>
+      </div>
+
+      <div class="score-bar-wrap">
+        <div class="score-bar-bg">
+          <div class="score-bar-fill" style="width:${score}%"></div>
+        </div>
+      </div>
+
+      <button class="gap-toggle" onclick="toggleGap('${cardId}', ${JSON.stringify(userSkills).replace(/"/g, '&quot;')}, '${job.skills}')">
+        Show Skill Gap ▾
+      </button>
+      <div class="gap-section" id="${cardId}"></div>
+    `;
+    return card;
+  }
+
+  async function toggleGap(cardId, userSkills, jobSkills) {
+    const section = document.getElementById(cardId);
+    const btn     = section.previousElementSibling;
+
+    if (section.classList.contains("open")) {
+      section.classList.remove("open");
+      btn.textContent = "Show Skill Gap ▾";
+      return;
+    }
+
+    // Fetch if not already loaded
+    if (!section.dataset.loaded) {
+      try {
+        const res = await fetch(`${API}/skill-gap`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_skills: userSkills, job_skills: jobSkills }),
+        });
+        const gap = await res.json();
+        section.innerHTML = renderGap(gap);
+        section.dataset.loaded = "1";
+      } catch {
+        section.innerHTML = "<p>Could not load skill gap.</p>";
+      }
+    }
+
+    section.classList.add("open");
+    btn.textContent = "Hide Skill Gap ▴";
+  }
+
+  function renderGap(gap) {
+    const matched = gap.matched_skills.map(s => `<span class="skill-tag matched">✓ ${s}</span>`).join("") || "<em>None</em>";
+    const missing = gap.missing_skills.map(s => `<span class="skill-tag missing">✗ ${s}</span>`).join("") || "<em>None</em>";
+    return `
+      <div class="gap-label">Skill Match: ${gap.match_pct}%</div>
+      <div class="gap-label" style="margin-top:.6rem">✅ You have:</div>
+      <div class="gap-row">${matched}</div>
+      <div class="gap-label" style="margin-top:.6rem">📚 You need to learn:</div>
+      <div class="gap-row">${missing}</div>
+    `;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────
+  function showLoader()  { document.getElementById("loader").style.display = "block"; document.getElementById("results-section").style.display = "none"; hideError(); }
+  function hideLoader()  { document.getElementById("loader").style.display = "none"; }
+  function showError(msg){ const el = document.getElementById("error-msg"); el.textContent = msg; el.style.display = "block"; }
+  function hideError()   { document.getElementById("error-msg").style.display = "none"; }
+</script>
+
+</body>
+</html>

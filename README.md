@@ -28,8 +28,12 @@ A content-based job recommendation system built on the LinkedIn Job Postings dat
 │
 ├── notebooks/               # Step-by-step development notebooks
 │
-├── backend/                 # FastAPI backend (coming soon)
-├── frontend/                # Web UI (coming soon)
+├── backend/                 # FastAPI backend
+│   ├── main.py              #   App entrypoint — 4 endpoints
+│   ├── recommender.py       #   Skill mapping + inference logic
+│   └── schemas.py           #   Pydantic request/response models
+├── frontend/
+│   └── index.html           # Single-page UI
 ├── tests/                   # Unit tests (coming soon)
 │
 ├── requirements.txt
@@ -47,10 +51,10 @@ Raw Data → EDA → Feature Engineering → Model Training → FastAPI Backend 
 | Stage | Status | File |
 |---|---|---|
 | EDA | ✅ Done | `eda.py` |
-| Feature Engineering | 🔄 Next | `feature_engineering.py` |
-| Model Training | ⏳ Pending | `train.py` |
-| FastAPI Backend | ⏳ Pending | `backend/` |
-| Frontend | ⏳ Pending | `frontend/` |
+| Feature Engineering | ✅ Done | `feature_engineering.py` |
+| Model Training | ✅ Done | `train.py` |
+| FastAPI Backend | ✅ Done | `backend/` |
+| Frontend | ✅ Done | `frontend/index.html` |
 
 ---
 
@@ -67,9 +71,31 @@ Dataset is stored locally and excluded from git due to file size (postings.csv i
 
 ---
 
+## API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/health` | Health check |
+| POST | `/recommend` | Recommend jobs from skill list |
+| POST | `/resume` | Recommend jobs from uploaded PDF resume |
+| POST | `/skill-gap` | Skill gap analysis for a job |
+
+---
+
+## Running Locally
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload
+```
+
+Then open `http://localhost:8000` in your browser.
+
+---
+
 ## Tech Stack
 
-- **Data & ML:** Python, Pandas, Scikit-learn, NumPy
-- **Backend:** FastAPI
-- **Frontend:** HTML / CSS / JavaScript
+- **Data & ML:** Python, Pandas, Scikit-learn, NumPy, SciPy
+- **Backend:** FastAPI, Uvicorn, PyMuPDF
+- **Frontend:** HTML / CSS / JavaScript (no framework)
 - **Visualisation:** Matplotlib, Seaborn, WordCloud
