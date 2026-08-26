@@ -1,0 +1,29 @@
+# Dataset — too large for GitHub (~493MB)
+linkedin_dataset/
+
+# EDA plots — generated locally by running eda.py
+eda_outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+env/
+.venv/
+
+# Model artifacts
+*.pkl
+*.joblib
+*.h5
+*.pt
+models/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
