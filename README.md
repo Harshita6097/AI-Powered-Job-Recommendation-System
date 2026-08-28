@@ -119,7 +119,7 @@ User skills / Resume PDF
 ## Evaluation Results
 
 500 test queries, 123,842 job pool, seed=42.  
-Query = job's own granular skills. Relevance = result shares ≥1 skill with query.
+Query = job's own granular skills. Relevance = result shares ≥1 canonical skill with the query under the current binary evaluation protocol.
 
 ### Hit Rate (did the original job appear in top-k?)
 
@@ -130,14 +130,7 @@ Query = job's own granular skills. Relevance = result shares ≥1 skill with que
 | Hybrid | 33.0% | 37.8% | 40.8% |
 | **BM25** | **35.4%** | **40.6%** | **45.8%** |
 
-### Precision (fraction of top-k sharing ≥1 skill with query)
-
-| Mode | @5 | @10 | @20 |
-|---|---|---|---|
-| TF-IDF | ~0% | ~0% | ~0% |
-| Dense | 98.6% | 98.4% | 97.9% |
-| Hybrid | **99.8%** | **99.8%** | **99.6%** |
-| BM25 | 100% | 100% | 100% |
+> Under the current binary relevance definition (≥1 shared canonical skill), BM25 achieves Precision@10 of 100%. This reflects excellent exact-skill retrieval but likely overestimates real-world recommendation quality because partial skill overlap is treated as fully relevant.
 
 ### NDCG (position-weighted relevance, 1.0 = perfect)
 
@@ -152,7 +145,7 @@ Query = job's own granular skills. Relevance = result shares ≥1 skill with que
 
 - **TF-IDF precision ≈ 0%** in the new eval because the test queries use granular skills (`python`, `docker`) but TF-IDF was trained on broad categories (`Information Technology`). TF-IDF still works correctly when queried with its own broad-category vocabulary (original eval: Precision@10 = 99.9%).
 - **BM25 Hit@10 = 40.6%** on 123,842 jobs = **5,000× better than random (0.008%)**.
-- **Hybrid NDCG = 0.999** — the cross-encoder produces the best-ordered results even when it doesn't always surface the exact original job.
+- **NDCG** is reported under the current binary relevance protocol (shared canonical skill) and reflects ranking quality within this evaluation setup.
 - BM25 wins on raw hit rate; Hybrid wins on ranking quality (NDCG) and is the recommended production mode.
 
 ---
