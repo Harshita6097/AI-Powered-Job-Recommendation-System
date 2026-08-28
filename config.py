@@ -6,7 +6,11 @@ Import with:
     from config import CFG
 """
 
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()   # loads .env if present — values override defaults below
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 ROOT        = Path(__file__).parent
@@ -41,7 +45,8 @@ EMBED_CONFIG_JSON    = DATA_INDEX / "embed_config.json"
 
 # ── Retrieval mode ────────────────────────────────────────────────────────────
 # Options: "tfidf" | "bm25" | "dense" | "hybrid"
-RETRIEVAL_MODE = "tfidf"   # default — keeps existing system working
+# Override via .env:  RETRIEVAL_MODE=bm25
+RETRIEVAL_MODE = os.getenv("RETRIEVAL_MODE", "hybrid")
 
 # ── TF-IDF (legacy baseline) ──────────────────────────────────────────────────
 TFIDF_MAX_FEATURES = 8000

@@ -18,7 +18,7 @@ from backend.schemas import (
 from backend.logger import get_logger
 from src.inference.engine import recommend as engine_recommend
 from src.inference.engine import skill_gap as engine_skill_gap
-from src.inference.engine import load_all
+from src.inference.engine import load_all, cache_info, cache_clear
 from src.preprocessing.skill_extractor import extract_skills
 
 log = get_logger("api")
@@ -63,7 +63,19 @@ async def log_requests(request: Request, call_next):
 @app.get("/health")
 def health():
     log.debug("Health check")
-    return {"status": "ok"}
+    return {"status": "ok", "mode": config.RETRIEVAL_MODE, "cache": cache_info()}
+
+
+@app.get("/cache")
+def get_cache_info():
+    return {"cache": cache_info(), "mode": config.RETRIEVAL_MODE}
+
+
+@app.delete("/cache")
+def clear_cache():
+    cache_clear()
+    log.info("Recommendation cache cleared")
+    return {"status": "cleared"}
 
 
 @app.post("/recommend", response_model=RecommendResponse)
