@@ -16,6 +16,8 @@ def build_allowed_ids(
     filter_exp: bool = False,
     experience_level: str | None = None,
     filter_remote: bool = False,
+    salary_min: float | None = None,
+    salary_max: float | None = None,
 ) -> set[str] | None:
     """
     Return a set of job_ids that pass all active filters, or None if no
@@ -27,8 +29,10 @@ def build_allowed_ids(
     filter_exp       : if True, restrict to jobs matching experience_level
     experience_level : target experience level string
     filter_remote    : if True, restrict to remote jobs only
+    salary_min       : if set, exclude jobs with salary_mid below this value
+    salary_max       : if set, exclude jobs with salary_mid above this value
     """
-    if not filter_exp and not filter_remote:
+    if not filter_exp and not filter_remote and salary_min is None and salary_max is None:
         return None   # no filtering — caller skips the check entirely
 
     allowed = set()
@@ -38,6 +42,15 @@ def build_allowed_ids(
                 continue
         if filter_remote:
             if not row.get("is_remote"):
+                continue
+        if salary_min is not None or salary_max is not None:
+            mid = row.get("salary_mid")
+            # jobs without salary data are excluded when a salary filter is active
+            if mid is None or (isinstance(mid, float) and mid != mid):  # NaN check
+                continue
+            if salary_min is not None and mid < salary_min:
+                continue
+            if salary_max is not None and mid > salary_max:
                 continue
         allowed.add(jid)
     return allowed

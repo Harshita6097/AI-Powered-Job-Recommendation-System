@@ -87,12 +87,15 @@ def get_recommendations(req: RecommendRequest):
         out = engine_recommend(
             skills=req.skills,
             experience_level=req.experience_level,
-            top_n=req.top_n,
+            top_n=req.top_n + req.offset,
             filter_exp=req.filter_exp,
             filter_remote=req.filter_remote,
+            salary_min=req.salary_min,
+            salary_max=req.salary_max,
         )
         if not out["results"]:
             raise HTTPException(status_code=404, detail="No results found for given filters")
+        page = out["results"][req.offset: req.offset + req.top_n]
         jobs = [
             JobResult(
                 job_id=str(r["job_id"]),
@@ -106,13 +109,15 @@ def get_recommendations(req: RecommendRequest):
                 state=r.get("state"),
                 match_score=r["match_score"],
             )
-            for r in out["results"]
+            for r in page
         ]
         return RecommendResponse(
             query_skills_raw=out["query_skills_raw"],
             query_skills_mapped=out["query_skills_mapped"],
             unmapped_skills=out["unmapped_skills"],
             retrieval_mode=out["retrieval_mode"],
+            total=len(out["results"]),
+            offset=req.offset,
             results=jobs,
         )
 
@@ -147,6 +152,8 @@ def get_recommendations(req: RecommendRequest):
         query_skills_mapped=mapped_skills,
         unmapped_skills=unmapped,
         retrieval_mode="tfidf",
+        total=len(results_df),
+        offset=req.offset,
         results=jobs,
     )
 

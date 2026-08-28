@@ -165,6 +165,7 @@ def _run_hybrid(query_tokens: list[str], query_text: str,
 @functools.lru_cache(maxsize=256)
 def _cached_pipeline(skills_key: tuple, experience_level: str | None,
                      top_n: int, filter_exp: bool, filter_remote: bool,
+                     salary_min: float | None, salary_max: float | None,
                      mode: str) -> tuple:
     """
     Cached inner pipeline call. Returns a tuple (results_tuple, mapped, unmapped).
@@ -176,6 +177,8 @@ def _cached_pipeline(skills_key: tuple, experience_level: str | None,
         top_n=top_n,
         filter_exp=filter_exp,
         filter_remote=filter_remote,
+        salary_min=salary_min,
+        salary_max=salary_max,
     )
     # freeze results for caching
     return (tuple(result["results"]), tuple(result["query_skills_mapped"]),
@@ -194,7 +197,9 @@ def cache_clear() -> None:
 # ── core pipeline (uncached) ───────────────────────────────────────────────────
 
 def _run_pipeline(skills: list[str], experience_level: str | None,
-                  top_n: int, filter_exp: bool, filter_remote: bool) -> dict:
+                  top_n: int, filter_exp: bool, filter_remote: bool,
+                  salary_min: float | None = None,
+                  salary_max: float | None = None) -> dict:
     """Run the retrieval pipeline for the current RETRIEVAL_MODE."""
     granular = list(extract_skills(", ".join(skills)))
     unmapped = [s for s in skills if s.lower() not in {g.lower() for g in granular}]
@@ -204,7 +209,8 @@ def _run_pipeline(skills: list[str], experience_level: str | None,
     query_text   = ", ".join(query_skills)
 
     # build pre-filter set (None = no filter = all jobs allowed)
-    allowed = build_allowed_ids(_lookup, filter_exp, experience_level, filter_remote)
+    allowed = build_allowed_ids(_lookup, filter_exp, experience_level, filter_remote,
+                                salary_min, salary_max)
 
     if config.RETRIEVAL_MODE == "bm25":
         _load_bm25_artifacts()
@@ -250,27 +256,31 @@ def recommend(
     top_n: int = 10,
     filter_exp: bool = False,
     filter_remote: bool = False,
+    salary_min: float | None = None,
+    salary_max: float | None = None,
 ) -> dict:
     t0 = time.time()
     _load_granular()
 
     mode = config.RETRIEVAL_MODE
-    log.info("recommend | mode=%s skills=%s exp=%s filter_exp=%s remote=%s",
-             mode, skills, experience_level, filter_exp, filter_remote)
+    log.info("recommend | mode=%s skills=%s exp=%s filter_exp=%s remote=%s salary=[%s,%s]",
+             mode, skills, experience_level, filter_exp, filter_remote, salary_min, salary_max)
 
     # cache key: sorted skills tuple so order doesn't matter
     skills_key = tuple(sorted(s.lower() for s in skills))
 
     try:
         results_t, mapped_t, unmapped_t = _cached_pipeline(
-            skills_key, experience_level, top_n, filter_exp, filter_remote, mode
+            skills_key, experience_level, top_n, filter_exp, filter_remote,
+            salary_min, salary_max, mode
         )
         results  = list(results_t)
         mapped   = list(mapped_t)
         unmapped = list(unmapped_t)
     except Exception as e:
         log.warning("Cache miss / pipeline error: %s — running uncached", e)
-        out      = _run_pipeline(skills, experience_level, top_n, filter_exp, filter_remote)
+        out      = _run_pipeline(skills, experience_level, top_n, filter_exp, filter_remote,
+                                 salary_min, salary_max)
         results  = out["results"]
         mapped   = out["query_skills_mapped"]
         unmapped = out["unmapped_skills"]
