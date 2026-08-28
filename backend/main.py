@@ -103,10 +103,10 @@ def get_recommendations(req: RecommendRequest):
                 experience_level=r.get("experience_level") or "",
                 industry=r.get("industry") or "",
                 skills=r.get("skills") or "",
-                salary_mid=r.get("salary_mid"),
+                salary_mid=r.get("salary_mid") if r.get("salary_mid") == r.get("salary_mid") else None,
                 work_type=r.get("work_type") or "",
                 is_remote=bool(r.get("is_remote", False)),
-                state=r.get("state"),
+                state=r.get("state") if isinstance(r.get("state"), str) else None,
                 match_score=r["match_score"],
             )
             for r in page
@@ -192,10 +192,10 @@ async def recommend_from_resume(
                 experience_level=r.get("experience_level") or "",
                 industry=r.get("industry") or "",
                 skills=r.get("skills") or "",
-                salary_mid=r.get("salary_mid"),
+                salary_mid=r.get("salary_mid") if r.get("salary_mid") == r.get("salary_mid") else None,
                 work_type=r.get("work_type") or "",
                 is_remote=bool(r.get("is_remote", False)),
-                state=r.get("state"),
+                state=r.get("state") if isinstance(r.get("state"), str) else None,
                 match_score=r["match_score"],
             )
             for r in out["results"]

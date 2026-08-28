@@ -95,6 +95,8 @@ def _format_results(job_ids: list[str], scores: list[float],
         row = _lookup.get(jid)
         if row is None:
             continue
+        state = row.get("state")
+        salary = row.get("salary_mid") if row.get("has_salary") else None
         rows.append({
             "job_id":           jid,
             "title":            row.get("title_clean", ""),
@@ -102,10 +104,10 @@ def _format_results(job_ids: list[str], scores: list[float],
             "industry":         row.get("industry", ""),
             "skills":           row.get("granular_skills", ""),
             "broad_skills":     row.get("broad_skills_str", ""),
-            "salary_mid":       row.get("salary_mid") if row.get("has_salary") else None,
+            "salary_mid":       float(salary) if salary == salary and salary is not None else None,
             "work_type":        row.get("work_type", ""),
             "is_remote":        bool(row.get("is_remote", False)),
-            "state":            row.get("state"),
+            "state":            state if isinstance(state, str) else None,
             score_key:          round(float(score), 4),
         })
     return rows
